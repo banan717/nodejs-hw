@@ -1,4 +1,5 @@
 import createHttpError from 'http-errors';
+
 import { Note } from '../models/note.js';
 
 export async function getAllNotes(req, res) {
@@ -10,20 +11,14 @@ export async function getAllNotes(req, res) {
 
   const query = { userId: req.user._id };
 
-  if (tag) {
-    query.tag = tag;
-  }
+  if (tag) query.tag = tag;
+  if (search) query.$text = { $search: search };
 
-  if (search) {
-    query.$text = { $search: search };
-  }
+  const totalNotes = await Note.countDocuments(query);
 
-  const notesQuery = Note.find(query);
-
-  const [totalNotes, notes] = await Promise.all([
-    Note.countDocuments(query),
-    notesQuery.skip(skip).limit(perPageNum),
-  ]);
+  const notes = await Note.find(query)
+    .skip(skip)
+    .limit(perPageNum);
 
   const totalPages = Math.ceil(totalNotes / perPageNum);
 
@@ -37,59 +32,45 @@ export async function getAllNotes(req, res) {
 }
 
 export async function getNoteById(req, res) {
-  const { noteId } = req.params;
-
+  const noteId = req.params.noteId;
   const note = await Note.findOne({
     _id: noteId,
     userId: req.user._id,
   });
-
   if (!note) {
     throw createHttpError(404, 'Note not found');
   }
-
   res.status(200).json(note);
 }
 
 export async function createNote(req, res) {
-  const note = await Note.create({
-    ...req.body,
-    userId: req.user._id,
-  });
-
+  const note = await Note.create({ ...req.body, userId: req.user._id });
   res.status(201).json(note);
 }
 
 export async function deleteNote(req, res) {
-  const { noteId } = req.params;
-
+  const noteId = req.params.noteId;
   const note = await Note.findOneAndDelete({
     _id: noteId,
     userId: req.user._id,
   });
-
   if (!note) {
     throw createHttpError(404, 'Note not found');
   }
-
   res.status(200).json(note);
 }
 
 export async function updateNote(req, res) {
-  const { noteId } = req.params;
-
+  const noteId = req.params.noteId;
   const note = await Note.findOneAndUpdate(
     { _id: noteId, userId: req.user._id },
     req.body,
     {
       returnDocument: 'after',
-      runValidators: true,
     },
   );
-
   if (!note) {
     throw createHttpError(404, 'Note not found');
   }
-
   res.status(200).json(note);
 }
